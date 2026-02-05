@@ -73,6 +73,45 @@ ext_data_clb(const struct lysc_ext_instance *ext, const struct lyd_node *parent,
     return LY_SUCCESS;
 }
 
+/* creation helpers */
+static LY_ERR create_network_instances(const struct lys_module *mod_ni, struct lyd_node **root)
+{
+    return lyd_new_inner(NULL, mod_ni, "network-instances", 0, root);
+}
+
+static LY_ERR create_network_instance(struct lyd_node *root, const char *name, struct lyd_node **ni)
+{
+    return lyd_new_list(root, NULL, "network-instance", 0, ni, name);
+}
+
+static LY_ERR create_vrf_root(struct lyd_node *ni, struct lyd_node **vrf)
+{
+    return lyd_new_inner(ni, NULL, "vrf-root", 0, vrf);
+}
+
+static LY_ERR create_routing(struct lyd_node *vrf, const struct lys_module *mod_rt, struct lyd_node **routing)
+{
+    return lyd_new_inner(vrf, mod_rt, "routing", 0, routing);
+}
+
+static LY_ERR create_ribs(struct lyd_node *routing, struct lyd_node **ribs)
+{
+    return lyd_new_inner(routing, NULL, "ribs", 0, ribs);
+}
+
+static LY_ERR create_rib(struct lyd_node *ribs, const char *name, struct lyd_node **rib)
+{
+    return lyd_new_list(ribs, NULL, "rib", 0, rib, name);
+}
+
+static LY_ERR create_address_family(struct lyd_node *rib, const char *val)
+{
+    return lyd_new_term(rib, NULL, "address-family", val, 0, NULL);
+}
+
+/* convenience macro to call helper and jump to cleanup on error */
+#define CALL_OR_CLEANUP(call) do { rc = (call); if (rc != LY_SUCCESS) goto cleanup; } while (0)
+
 int
 main(void)
 {
@@ -97,27 +136,31 @@ main(void)
     /* register ext-data callback (will be called when parsing data under mount-points) */
     ly_ctx_set_ext_data_clb(ctx, ext_data_clb, (void *)ext_data_xml);
 
-    /* Example data: a network-instance with vrf-root that contains routing data */
-    const char *data_xml =
-        "<network-instances xmlns=\"urn:ietf:params:xml:ns:yang:ietf-network-instance\">"
-        "  <network-instance>"
-        "    <name>VRF1</name>"
-        "    <vrf-root>"
-        "      <routing xmlns=\"urn:ietf:params:xml:ns:yang:ietf-routing\">"
-        "        <ribs>"
-        "          <rib>"
-        "            <name>default</name>"
-        "            <address-family>ipv4</address-family>"
-        "          </rib>"
-        "        </ribs>"
-        "      </routing>"
-        "    </vrf-root>"
-        "  </network-instance>"
-        "</network-instances>";
+    /* Build the same data tree programmatically using libyang APIs */
+    const struct lys_module *mod_ni = ly_ctx_get_module_implemented(ctx, "ietf-network-instance");
+    const struct lys_module *mod_rt = ly_ctx_get_module_implemented(ctx, "ietf-routing");
+    if (!mod_ni || !mod_rt) {
+        fprintf(stderr, "Required modules not loaded\n");
+        ly_ctx_destroy(ctx);
+        return 1;
+    }
 
-    rc = lyd_parse_data_mem(ctx, data_xml, LYD_XML, 0, LYD_VALIDATE_PRESENT, &tree);
+    struct lyd_node *root = NULL, *ni = NULL, *vrf = NULL, *routing = NULL, *ribs = NULL, *rib = NULL;
+
+    CALL_OR_CLEANUP(create_network_instances(mod_ni, &root));
+    CALL_OR_CLEANUP(create_network_instance(root, "VRF1", &ni));
+    CALL_OR_CLEANUP(create_vrf_root(ni, &vrf));
+    CALL_OR_CLEANUP(create_routing(vrf, mod_rt, &routing));
+    CALL_OR_CLEANUP(create_ribs(routing, &ribs));
+    CALL_OR_CLEANUP(create_rib(ribs, "default", &rib));
+    CALL_OR_CLEANUP(create_address_family(rib, "ietf-routing:ipv4"));
+
+    tree = root;
+
+cleanup:
     if (rc != LY_SUCCESS) {
-        fprintf(stderr, "Failed to parse data: %s\n", ly_errmsg(ctx));
+        fprintf(stderr, "Failed to build data tree: %s\n", ly_errmsg(ctx));
+        lyd_free_all(root);
         ly_ctx_destroy(ctx);
         return 1;
     }
