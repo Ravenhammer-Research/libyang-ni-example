@@ -1,0 +1,47 @@
+Created main context.
+Loaded module: ietf-network-instance
+Modules in main context:
+ - ietf-inet-types@2025-12-22
+ - ietf-yang-types@2025-12-22
+ - ietf-yang-metadata@2016-08-05 (implemented)
+ - yang@2025-01-29 (implemented)
+ - default@2025-06-18 (implemented)
+ - ietf-yang-schema-mount@2019-01-14 (implemented)
+ - ietf-yang-structure-ext@2020-06-17
+ - ietf-datastores@2018-02-14 (implemented)
+ - ietf-yang-library@2019-01-04 (implemented)
+ - ietf-network-instance@2019-01-21 (implemented)
+ - ietf-interfaces@2018-02-20 (implemented)
+ - ietf-ip@2018-02-22 (implemented)
+Created mount context.
+Loaded mount module: ietf-routing
+Modules in mount context:
+ - ietf-inet-types@2025-12-22
+ - ietf-yang-types@2025-12-22
+ - ietf-yang-metadata@2016-08-05 (implemented)
+ - yang@2025-01-29 (implemented)
+ - default@2025-06-18 (implemented)
+ - ietf-yang-schema-mount@2019-01-14 (implemented)
+ - ietf-yang-structure-ext@2020-06-17
+ - ietf-datastores@2018-02-14 (implemented)
+ - ietf-yang-library@2019-01-04 (implemented)
+ - ietf-routing@2018-03-13 (implemented)
+ - ietf-interfaces@2018-02-20 (implemented)
+Created root container.
+Created network-instance 'inst1'.
+[libyang ERR] Mandatory node "content-id" instance does not exist.
+  data-path: /ietf-yang-library:yang-library
+Stack trace (most recent call first):
+  0x401a74 </home/sq/test/example> (_start)
+  0x821dd119a </usr/local/lib/libyang.so.5> (ly_temp_log_clb)
+  0x821dd1325 </usr/local/lib/libyang.so.5> (ly_temp_log_clb)
+  0x821f07048 </usr/local/lib/libyang.so.5> (lyd_validate_op)
+  0x821f06e13 </usr/local/lib/libyang.so.5> (lyd_validate_op)
+  0x821f043d6 </usr/local/lib/libyang.so.5> (lyxp_get_expr)
+  0x821f04495 </usr/local/lib/libyang.so.5> (lyxp_get_expr)
+  0x821f03ad7 </usr/local/lib/libyang.so.5> (lyxp_get_expr)
+  0x821f04b3f </usr/local/lib/libyang.so.5> (lyd_validate_all)
+  0x401283 </home/sq/test/example> (main)
+  0x82502d37f </lib/libc.so.7> (__libc_start1)
+Data tree validation failed
+libyang error: Mandatory node "content-id" instance does not exist.
