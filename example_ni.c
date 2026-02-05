@@ -18,58 +18,100 @@ static struct ly_ctx *g_ctx = NULL;
  * describing mounting of ietf-routing at the mount-point label "vrf-root"
  * defined in module ietf-network-instance.
  */
-static const char *ext_data_xml =
-    "<yang-library xmlns=\"urn:ietf:params:xml:ns:yang:ietf-yang-library\">"
-    "  <module-set>"
-    "    <name>set1</name>"
-    "    <module>"
-    "      <name>ietf-routing</name>"
-    "      <namespace>urn:ietf:params:xml:ns:yang:ietf-routing</namespace>"
-    "    </module>"
-    "  </module-set>"
-    "  <content-id>1</content-id>"
-    "</yang-library>"
-    "<schema-mounts xmlns=\"urn:ietf:params:xml:ns:yang:ietf-yang-schema-mount\">"
-    "  <mount-point>"
-    "    <module>ietf-network-instance</module>"
-    "    <label>vrf-root</label>"
-    "    <inline/>"
-    "  </mount-point>"
-    "</schema-mounts>";
+/* (yang-library node omitted) */
+LY_ERR build_yang_library(struct ly_ctx *ctx, struct lyd_node **yl)
+{
+    LY_ERR rc = LY_SUCCESS;
+    const struct lys_module *mod_yl;
+    struct lyd_node *module_set = NULL, *module = NULL;
+
+    if (!ctx || !yl) {
+        return LY_EINVAL;
+    }
+
+    mod_yl = ly_ctx_get_module_implemented(ctx, "ietf-yang-library");
+    if (!mod_yl) {
+        return LY_EINVAL;
+    }
+
+
+    CHECK_RET(lyd_new_inner(NULL, mod_yl, "yang-library", 0, yl));
+    CHECK_RET(lyd_new_list(*yl, mod_yl, "module-set", 0, &module_set, "set1"));
+    CHECK_RET(lyd_new_list(module_set, mod_yl, "module", 0, &module, "ietf-routing"));
+    CHECK_RET(lyd_new_term(module, mod_yl, "namespace", "urn:ietf:params:xml:ns:yang:ietf-routing", 0, NULL));
+    CHECK_RET(lyd_new_term(*yl, mod_yl, "content-id", "1", 0, NULL));
+
+    return LY_SUCCESS;
+
+cleanup:
+    lyd_free_all(*yl);
+    *yl = NULL;
+    return rc;
+}
+
+/* Build minimal schema-mounts ext-data using libyang APIs */
+LY_ERR build_schema_mounts(struct lyd_node **sm_root)
+{
+    LY_ERR rc = LY_SUCCESS;
+    const struct lys_module *mod_sm;
+
+    if (!g_ctx || !sm_root) {
+        return LY_EINVAL;
+    }
+
+    mod_sm = ly_ctx_get_module_implemented(g_ctx, "ietf-yang-schema-mount");
+    if (!mod_sm) {
+        return LY_EINVAL;
+    }
+
+    CHECK_RET(lyd_new_inner(NULL, mod_sm, "schema-mounts", 0, sm_root));
+    {
+        struct lyd_node *mp = NULL;
+        /* create list instance with keys (module, label) */
+        CHECK_RET(lyd_new_list(*sm_root, NULL, "mount-point", 0, &mp, "ietf-network-instance", "vrf-root"));
+        CHECK_RET(lyd_new_inner(mp, NULL, "inline", 0, NULL));
+    }
+
+    return LY_SUCCESS;
+
+cleanup:
+    lyd_free_all(*sm_root);
+    *sm_root = NULL;
+    return rc;
+}
 
 /* callback invoked by libyang to get extension data for a mount-point instance */
 LY_ERR ext_data_clb(const struct lysc_ext_instance *ext, const struct lyd_node *parent, void *user_data,
-             void **ext_data, ly_bool *ext_data_free)
+                    void **ext_data, ly_bool *ext_data_free)
 {
-    struct lyd_node *data = NULL;
-    const char *xml = (const char *)user_data;
+    struct lyd_node *yl = NULL, *sm_root = NULL, *first = NULL;
+    LY_ERR rc = LY_SUCCESS;
 
     (void)ext;
     (void)parent;
+    (void)user_data;
 
-    if (!g_ctx || !xml) {
+    if (!g_ctx) {
         return LY_EINVAL;
     }
 
-    /* parse the provided XML (yang-library + schema-mounts) in the current context */
-    if (lyd_parse_data_mem(g_ctx, xml, LYD_XML, LYD_PARSE_ONLY, 0, &data) != LY_SUCCESS) {
-        return LY_EINVAL;
-    }
+    /* provide minimal yang-library + schema-mounts as siblings (yang-library required by plugin) */
+    CHECK_RET(build_yang_library(g_ctx, &yl));
+    CHECK_RET(build_schema_mounts(&sm_root));
 
-    /* validate the parsed ext-data against the ietf-yang-schema-mount module */
-    const struct lys_module *sm_mod = ly_ctx_get_module_implemented(g_ctx, "ietf-yang-schema-mount");
-    if (!sm_mod) {
-        lyd_free_all(data);
-        return LY_EINVAL;
-    }
-    if (lyd_validate_module(&data, sm_mod, 0, NULL) != LY_SUCCESS) {
-        lyd_free_all(data);
-        return LY_EINVAL;
-    }
+    first = yl;
+    CHECK_RET(lyd_insert_sibling(yl, sm_root, &first));
 
-    *ext_data = data;
-    *ext_data_free = 1; /* libyang should free the returned data when appropriate */
+    CHECK_RET(lyd_validate_module(&first, ly_ctx_get_module_implemented(g_ctx, "ietf-yang-schema-mount"), 0, NULL));
+
+    *ext_data = first;
+    *ext_data_free = 1;
     return LY_SUCCESS;
+
+cleanup:
+    lyd_free_all(yl);
+    lyd_free_all(sm_root);
+    return rc;
 }
 
 /* creation helpers */
@@ -130,7 +172,7 @@ main(void)
     ly_ctx_load_module(ctx, "ietf-routing", NULL, NULL);
 
     /* register ext-data callback (will be called when parsing data under mount-points) */
-    ly_ctx_set_ext_data_clb(ctx, ext_data_clb, (void *)ext_data_xml);
+    ly_ctx_set_ext_data_clb(ctx, ext_data_clb, NULL);
 
     /* Build the same data tree programmatically using libyang APIs */
     const struct lys_module *mod_ni = ly_ctx_get_module_implemented(ctx, "ietf-network-instance");
