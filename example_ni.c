@@ -80,7 +80,21 @@ cleanup:
     return rc;
 }
 
-/* callback invoked by libyang to get extension data for a mount-point instance */
+/*
+ * Callback invoked by libyang to get extension data for a mount-point instance.
+ * Timing and reentrancy notes:
+ * - The callback is called by libyang whenever it encounters a schema-mount
+ *   extension instance while parsing or validating data. In this example it
+ *   can be invoked during the programmatic construction of the tree in
+ *   `main()` (for example while creating `vrf-root` / `routing`).
+ * - The callback may be called reentrantly (libyang may parse/validate
+ *   additional data while the callback runs). Therefore the callback must
+ *   allocate and return a fresh ext-data tree (do not return pointers into
+ *   global/shared trees) and must avoid modifying global parser/context state
+ *   in a non-thread-safe way.
+ * - Return `*ext_data_free = 1` so libyang will free the returned tree when
+ *   appropriate. On error, free any partially-built data before returning.
+ */
 LY_ERR ext_data_clb(const struct lysc_ext_instance *ext, const struct lyd_node *parent, void *user_data,
                     void **ext_data, ly_bool *ext_data_free)
 {
@@ -171,7 +185,12 @@ main(void)
     ly_ctx_load_module(ctx, "ietf-network-instance", NULL, NULL);
     ly_ctx_load_module(ctx, "ietf-routing", NULL, NULL);
 
-    /* register ext-data callback (will be called when parsing data under mount-points) */
+    /*
+     * Register ext-data callback. Note: the callback may be invoked while
+     * the application is itself building the data tree (see comments above),
+     * so the callback implementation must be reentrancy-safe and must not
+     * rely on mutable global state without proper synchronization.
+     */
     ly_ctx_set_ext_data_clb(ctx, ext_data_clb, NULL);
 
     /* Build the same data tree programmatically using libyang APIs */
