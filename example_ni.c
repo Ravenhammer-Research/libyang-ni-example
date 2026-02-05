@@ -10,7 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <libyang/libyang.h>
+#include "example_ni.h"
 
 static struct ly_ctx *g_ctx = NULL;
 
@@ -38,8 +38,7 @@ static const char *ext_data_xml =
     "</schema-mounts>";
 
 /* callback invoked by libyang to get extension data for a mount-point instance */
-static LY_ERR
-ext_data_clb(const struct lysc_ext_instance *ext, const struct lyd_node *parent, void *user_data,
+LY_ERR ext_data_clb(const struct lysc_ext_instance *ext, const struct lyd_node *parent, void *user_data,
              void **ext_data, ly_bool *ext_data_free)
 {
     struct lyd_node *data = NULL;
@@ -74,43 +73,40 @@ ext_data_clb(const struct lysc_ext_instance *ext, const struct lyd_node *parent,
 }
 
 /* creation helpers */
-static LY_ERR create_network_instances(const struct lys_module *mod_ni, struct lyd_node **root)
+LY_ERR create_network_instances(const struct lys_module *mod_ni, struct lyd_node **root)
 {
     return lyd_new_inner(NULL, mod_ni, "network-instances", 0, root);
 }
 
-static LY_ERR create_network_instance(struct lyd_node *root, const char *name, struct lyd_node **ni)
+LY_ERR create_network_instance(struct lyd_node *root, const char *name, struct lyd_node **ni)
 {
     return lyd_new_list(root, NULL, "network-instance", 0, ni, name);
 }
 
-static LY_ERR create_vrf_root(struct lyd_node *ni, struct lyd_node **vrf)
+LY_ERR create_vrf_root(struct lyd_node *ni, struct lyd_node **vrf)
 {
     return lyd_new_inner(ni, NULL, "vrf-root", 0, vrf);
 }
 
-static LY_ERR create_routing(struct lyd_node *vrf, const struct lys_module *mod_rt, struct lyd_node **routing)
+LY_ERR create_routing(struct lyd_node *vrf, const struct lys_module *mod_rt, struct lyd_node **routing)
 {
     return lyd_new_inner(vrf, mod_rt, "routing", 0, routing);
 }
 
-static LY_ERR create_ribs(struct lyd_node *routing, struct lyd_node **ribs)
+LY_ERR create_ribs(struct lyd_node *routing, struct lyd_node **ribs)
 {
     return lyd_new_inner(routing, NULL, "ribs", 0, ribs);
 }
 
-static LY_ERR create_rib(struct lyd_node *ribs, const char *name, struct lyd_node **rib)
+LY_ERR create_rib(struct lyd_node *ribs, const char *name, struct lyd_node **rib)
 {
     return lyd_new_list(ribs, NULL, "rib", 0, rib, name);
 }
 
-static LY_ERR create_address_family(struct lyd_node *rib, const char *val)
+LY_ERR create_address_family(struct lyd_node *rib, const char *val)
 {
     return lyd_new_term(rib, NULL, "address-family", val, 0, NULL);
 }
-
-/* convenience macro to call helper and jump to cleanup on error */
-#define CALL_OR_CLEANUP(call) do { rc = (call); if (rc != LY_SUCCESS) goto cleanup; } while (0)
 
 int
 main(void)
@@ -147,13 +143,13 @@ main(void)
 
     struct lyd_node *root = NULL, *ni = NULL, *vrf = NULL, *routing = NULL, *ribs = NULL, *rib = NULL;
 
-    CALL_OR_CLEANUP(create_network_instances(mod_ni, &root));
-    CALL_OR_CLEANUP(create_network_instance(root, "VRF1", &ni));
-    CALL_OR_CLEANUP(create_vrf_root(ni, &vrf));
-    CALL_OR_CLEANUP(create_routing(vrf, mod_rt, &routing));
-    CALL_OR_CLEANUP(create_ribs(routing, &ribs));
-    CALL_OR_CLEANUP(create_rib(ribs, "default", &rib));
-    CALL_OR_CLEANUP(create_address_family(rib, "ietf-routing:ipv4"));
+    CHECK_RET(create_network_instances(mod_ni, &root));
+    CHECK_RET(create_network_instance(root, "VRF1", &ni));
+    CHECK_RET(create_vrf_root(ni, &vrf));
+    CHECK_RET(create_routing(vrf, mod_rt, &routing));
+    CHECK_RET(create_ribs(routing, &ribs));
+    CHECK_RET(create_rib(ribs, "default", &rib));
+    CHECK_RET(create_address_family(rib, "ietf-routing:ipv4"));
 
     tree = root;
 
