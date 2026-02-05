@@ -185,7 +185,7 @@ int main(void) {
   LY_ERR rc;
 
   /* Create context that will search the RFC directory for YANG modules */
-  if (ly_ctx_new("/home/sq/test/RFC", 0, &ctx) != LY_SUCCESS) {
+  if (ly_ctx_new("./yang/standard/ietf/RFC/", 0, &ctx) != LY_SUCCESS) {
     fprintf(stderr, "Failed to create libyang context\n");
     return 1;
   }
